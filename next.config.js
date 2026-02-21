@@ -6,6 +6,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  experiments: {
+    asyncWebAssembly: true,
+  },
 };
 
 module.exports = nextConfig;
