@@ -31,6 +31,7 @@ export interface Gift {
   utxo_txid: string | null;
   utxo_vout: number | null;
   utxo_amount_sats: number | null;
+  hd_index: number | null; // HD derivation index
 }
 
 export type GiftStatus = Gift['status'];
@@ -45,6 +46,7 @@ export async function createGift(params: {
   unlockAt: string;
   message?: string;
   feePercent?: number;
+  hdIndex?: number;
 }): Promise<Gift> {
   const { data, error } = await supabase
     .from('gifts')
@@ -56,6 +58,7 @@ export async function createGift(params: {
       message: params.message || null,
       fee_percent: params.feePercent || 1.0,
       status: 'pending',
+      hd_index: params.hdIndex ?? null,
     })
     .select()
     .single();
@@ -157,6 +160,27 @@ export async function getAllGifts(): Promise<Gift[]> {
   
   if (error) throw new Error(error.message);
   return data || [];
+}
+
+/**
+ * Get the next available HD index
+ * Returns max(hd_index) + 1 from existing gifts, or the configured starting index
+ */
+export async function getNextHDIndex(): Promise<number> {
+  const { data, error } = await supabase
+    .from('gifts')
+    .select('hd_index')
+    .not('hd_index', 'is', null)
+    .order('hd_index', { ascending: false })
+    .limit(1)
+    .single();
+  
+  if (error || !data) {
+    // No existing gifts with HD index, start from configured value
+    return parseInt(process.env.HD_INDEX || '0', 10);
+  }
+  
+  return (data.hd_index || 0) + 1;
 }
 
 /**

@@ -23,7 +23,7 @@ const network = (process.env.NEXT_PUBLIC_NETWORK || 'mainnet') as 'mainnet' | 't
 
 // Form validation schema
 const giftSchema = z.object({
-  amountSats: z.coerce.number().min(10000, 'Minimum 10,000 sats (~£5)'),
+  amountSats: z.coerce.number().min(6000, 'Minimum 6,000 sats (to cover fees)'),
   beneficiaryAddress: z.string().min(1, 'Beneficiary address required').refine(
     (addr) => validateAddress(addr, network),
     'Invalid Bitcoin address'
@@ -116,14 +116,14 @@ export function GiftForm({ onSuccess }: GiftFormProps) {
             <Input
               id="amountSats"
               type="number"
-              placeholder="100000 (10,000 sats = ~£5)"
+              placeholder="50000"
               {...register('amountSats')}
             />
             {errors.amountSats && (
               <p className="text-sm text-red-500">{errors.amountSats.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Minimum 10,000 sats (~£5)
+              Minimum 6,000 sats (~£3)
             </p>
           </div>
 

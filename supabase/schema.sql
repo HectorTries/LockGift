@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS gifts (
     sender_ip VARCHAR(45),
     utxo_txid VARCHAR(64),
     utxo_vout INTEGER,
-    utxo_amount_sats BIGINT
+    utxo_amount_sats BIGINT,
+    hd_index INTEGER
 );
 
 -- Index for faster queries

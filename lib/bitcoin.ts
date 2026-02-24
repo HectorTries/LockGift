@@ -6,6 +6,8 @@
 import * as bitcoin from 'bitcoinjs-lib';
 import { ECPairFactory } from 'ecpair';
 import * as tinysecp from 'tiny-secp256k1';
+import * as bip32 from 'bip32';
+import { payments, lazy } from 'bitcoinjs-lib';
 
 // Use ECPair for key handling
 const ECPair = ECPairFactory(tinysecp);
@@ -48,6 +50,44 @@ export function generateDepositAddress(wif: string, network: Network): string {
     network: getNetwork(network),
   });
   return address!;
+}
+
+/**
+ * Generate a unique HD wallet deposit address for a specific gift
+ * Uses BIP44 derivation: m/44'/0'/0'/0/index
+ * 
+ * @param rootSeed - BIP39 seed phrase
+ * @param index - Gift index (increments for each gift)
+ * @param network - mainnet or testnet
+ * @returns Unique deposit address for this gift
+ */
+export function generateHDFeatureAddress(
+  seedHex: string,
+  index: number,
+  network: Network
+): { address: string; privateKey: string } {
+  const networkConfig = getNetwork(network);
+  
+  // Create root node from seed
+  const root = bip32.fromSeed(Buffer.from(seedHex, 'hex'), networkConfig);
+  
+  // Derive path: m/44'/0'/0'/0/index (BIP44 for native segwit)
+  // coin_type': 0 for Bitcoin, 1 for Testnet
+  const coinType = network === 'mainnet' ? 0 : 1;
+  const path = `m/44'/${coinType}'/0'/0/${index}`;
+  
+  const child = root.derivePath(path);
+  
+  // Generate bech32 (native segwit) address
+  const { address } = payments.p2wpkh({
+    pubkey: child.publicKey,
+    network: networkConfig,
+  });
+  
+  return {
+    address: address!,
+    privateKey: child.toWIF(),
+  };
 }
 
 /**
