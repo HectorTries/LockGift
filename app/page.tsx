@@ -17,7 +17,7 @@ export default function HomePage() {
   } | null>(null);
   const [giftData, setGiftData] = useState<any>(null);
 
-  const network = (process.env.NEXT_PUBLIC_NETWORK || 'testnet') as 'mainnet' | 'testnet';
+  const network = (process.env.NEXT_PUBLIC_NETWORK || 'mainnet') as 'mainnet' | 'testnet';
 
   const handleSuccess = async (giftId: string, depositAddress: string) => {
     setCreatedGift({ id: giftId, depositAddress });

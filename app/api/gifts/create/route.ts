@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate beneficiary address
-    const network = (process.env.NEXT_PUBLIC_NETWORK || 'testnet') as 'mainnet' | 'testnet';
+    const network = (process.env.NEXT_PUBLIC_NETWORK || 'mainnet') as 'mainnet' | 'testnet';
     if (!validateAddress(beneficiaryAddress, network)) {
       return NextResponse.json(
         { message: 'Invalid Bitcoin address' },
