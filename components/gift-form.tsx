@@ -196,7 +196,7 @@ export function GiftForm({ onSuccess }: GiftFormProps) {
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
-            1% fee • Bitcoin locked immediately after deposit confirmation
+            5% fee • Bitcoin locked immediately after deposit confirmation
           </p>
         </form>
       </CardContent>
