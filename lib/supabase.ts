@@ -5,10 +5,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Only create client if credentials are available
+export const supabase = supabaseUrl && supabaseAnonKey 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 // Types for the gifts table
 export interface Gift {
@@ -48,6 +51,8 @@ export async function createGift(params: {
   feePercent?: number;
   hdIndex?: number;
 }): Promise<Gift> {
+  if (!supabase) throw new Error('Supabase not configured');
+  
   const { data, error } = await supabase
     .from('gifts')
     .insert({
@@ -71,6 +76,8 @@ export async function createGift(params: {
  * Get gift by ID
  */
 export async function getGift(id: string): Promise<Gift | null> {
+  if (!supabase) return null;
+  
   const { data, error } = await supabase
     .from('gifts')
     .select('*')
@@ -85,6 +92,8 @@ export async function getGift(id: string): Promise<Gift | null> {
  * Get gift by deposit address
  */
 export async function getGiftByDepositAddress(address: string): Promise<Gift | null> {
+  if (!supabase) return null;
+  
   const { data, error } = await supabase
     .from('gifts')
     .select('*')
@@ -105,6 +114,8 @@ export async function lockGift(id: string, params: {
   utxoVout: number;
   utxoAmountSats: number;
 }): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  
   const { error } = await supabase
     .from('gifts')
     .update({
@@ -125,6 +136,8 @@ export async function lockGift(id: string, params: {
  * Update gift status to claimed
  */
 export async function claimGift(id: string, claimTxid: string): Promise<void> {
+  if (!supabase) throw new Error('Supabase not configured');
+  
   const { error } = await supabase
     .from('gifts')
     .update({
@@ -141,6 +154,8 @@ export async function claimGift(id: string, claimTxid: string): Promise<void> {
  * Update deposit confirmations
  */
 export async function updateConfirmations(id: string, confirmations: number): Promise<void> {
+  if (!supabase) return;
+  
   const { error } = await supabase
     .from('gifts')
     .update({ deposit_confirmations: confirmations })
@@ -153,6 +168,8 @@ export async function updateConfirmations(id: string, confirmations: number): Pr
  * Get all gifts (admin)
  */
 export async function getAllGifts(): Promise<Gift[]> {
+  if (!supabase) return [];
+  
   const { data, error } = await supabase
     .from('gifts')
     .select('*')
@@ -167,6 +184,8 @@ export async function getAllGifts(): Promise<Gift[]> {
  * Returns max(hd_index) + 1 from existing gifts, or the configured starting index
  */
 export async function getNextHDIndex(): Promise<number> {
+  if (!supabase) return parseInt(process.env.HD_INDEX || '0', 10);
+  
   const { data, error } = await supabase
     .from('gifts')
     .select('hd_index')
