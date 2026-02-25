@@ -120,6 +120,7 @@ export interface LockingTxParams {
   unlockTimestamp: number; // Unix timestamp
   feePercent: number;
   feeAddress: string;
+  claimUrl: string; // URL for beneficiary to claim
   
   // Network
   network: Network;
@@ -166,6 +167,7 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
     unlockTimestamp,
     feePercent,
     feeAddress,
+    claimUrl,
     network,
   } = params;
 
@@ -185,7 +187,9 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
   
   // Calculate amounts
   const feeSats = Math.floor(utxoAmountSats * (feePercent / 100));
-  const lockedAmountSats = utxoAmountSats - feeSats;
+  // Reserve 546 sats for OP_RETURN (dust)
+  const opReturnDust = 546;
+  const lockedAmountSats = utxoAmountSats - feeSats - opReturnDust;
   
   if (lockedAmountSats <= 0) {
     throw new Error('Amount too small to cover fee');
@@ -195,13 +199,10 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
   const psbt = new bitcoin.Psbt({ network: networkConfig });
   
   // Add input (the UTXO we're spending)
-  // Note: In production, we'd need the full transaction hex of the UTXO
-  // For this implementation, we'll assume we're building from an existing UTXO
   psbt.addInput({
     hash: utxoTxId,
     index: utxoVout,
     sequence: 0xe0, // Enable locktime
-    // nonWitnessUtxo would be added here in production
   });
   
   // Output 1: Fee to operator (spendable immediately)
@@ -211,7 +212,6 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
   });
   
   // Output 2: Time-locked to beneficiary (P2WSH)
-  // Create P2WSH payment for the CLTV script
   const p2wsh = bitcoin.payments.p2wsh({
     redeem: { output: redeemScript },
     network: networkConfig,
@@ -220,6 +220,20 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
   psbt.addOutput({
     address: p2wsh.address,
     value: lockedAmountSats,
+  });
+  
+  // Output 3: OP_RETURN with claim instructions
+  // Encode claim URL as OP_RETURN
+  const message = `Claim at ${claimUrl}`;
+  const data = Buffer.from(message, 'utf8');
+  const opReturnScript = bitcoin.script.compile([
+    bitcoin.opcodes.OP_RETURN,
+    data,
+  ]);
+  
+  psbt.addOutput({
+    script: opReturnScript,
+    value: 0,
   });
   
   // Sign with hot wallet key

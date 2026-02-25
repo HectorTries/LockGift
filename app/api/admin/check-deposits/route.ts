@@ -94,6 +94,7 @@ export async function GET(request: NextRequest) {
           unlockTimestamp,
           feePercent,
           feeAddress,
+          claimUrl: `https://lockgift.vercel.app/gift/${gift.id}`,
           network,
         });
         

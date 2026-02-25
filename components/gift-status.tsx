@@ -16,10 +16,14 @@ import {
   ExternalLink,
   Copy,
   RefreshCw,
-  MessageSquare
+  MessageSquare,
+  Share2,
+  Wallet
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { 
   formatSatsHuman, 
   formatDate, 
@@ -97,6 +101,22 @@ export function GiftStatus({ gift, network }: GiftStatusProps) {
     }
   };
 
+  const shareLink = () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      navigator.share({
+        title: 'Bitcoin Time Gift',
+        text: `I've sent you a time-locked Bitcoin gift!`,
+        url,
+      });
+    } else {
+      copyToClipboard(url, 'share');
+    }
+  };
+
+  const isUnlocked = new Date(currentGift.unlock_at) <= new Date();
+  const canClaim = isUnlocked && currentGift.status === 'locked';
+
   return (
     <Card className="w-full max-w-lg mx-auto">
       <CardHeader>
@@ -105,14 +125,24 @@ export function GiftStatus({ gift, network }: GiftStatusProps) {
             <span className={status.color}>{status.icon}</span>
             {status.label}
           </CardTitle>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={refreshStatus}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex gap-1">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={shareLink}
+              title="Share gift link"
+            >
+              <Share2 className="w-4 h-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={refreshStatus}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </div>
         <CardDescription>{status.description}</CardDescription>
       </CardHeader>
@@ -249,16 +279,18 @@ export function GiftStatus({ gift, network }: GiftStatusProps) {
         )}
 
         {/* Claim button (if locked and unlock date passed) */}
-        {currentGift.status === 'locked' && new Date(currentGift.unlock_at) <= new Date() && (
-          <Button className="w-full" size="lg">
-            <Unlock className="w-4 h-4 mr-2" />
-            Claim Bitcoin
-          </Button>
+        {canClaim && (
+          <div className="space-y-3 pt-4">
+            <p className="text-sm text-center text-muted-foreground">
+              This gift is ready to claim! Enter your wallet address to claim.
+            </p>
+            <Button className="w-full" size="lg">
+              <Wallet className="w-4 h-4 mr-2" />
+              Claim Bitcoin
+            </Button>
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
-
-// Need to import Label
-import { Label } from '@/components/ui/label';

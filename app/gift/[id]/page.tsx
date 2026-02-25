@@ -21,7 +21,7 @@ export default function GiftPage({ params }: GiftPageProps) {
   const [loading, setLoading] = useState(true);
   const [giftId, setGiftId] = useState<string>('');
 
-  const network = (process.env.NEXT_PUBLIC_NETWORK || 'testnet') as 'mainnet' | 'testnet';
+  const network = (process.env.NEXT_PUBLIC_NETWORK || 'mainnet') as 'mainnet' | 'testnet';
 
   useEffect(() => {
     params.then(({ id }) => {
