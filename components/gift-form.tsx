@@ -6,12 +6,12 @@
  * Form to create a new time-locked Bitcoin gift
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, addYears, addMonths, addDays, min as dateMin } from 'date-fns';
-import { Lock, Calendar, Copy, Check, Wallet, ArrowRight } from 'lucide-react';
+import { Lock, Calendar, Copy, Check, Wallet, ArrowRight, PoundSterling } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +42,21 @@ interface GiftFormProps {
 export function GiftForm({ onSuccess }: GiftFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [btcGbpPrice, setBtcGbpPrice] = useState<number | null>(null);
+
+  // Fetch BTC price on mount
+  useEffect(() => {
+    async function fetchPrice() {
+      try {
+        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=gbp');
+        const data = await res.json();
+        setBtcGbpPrice(data.bitcoin.gbp);
+      } catch (e) {
+        console.error('Failed to fetch BTC price:', e);
+      }
+    }
+    fetchPrice();
+  }, []);
 
   const {
     register,
@@ -56,6 +71,10 @@ export function GiftForm({ onSuccess }: GiftFormProps) {
       message: '',
     },
   });
+
+  // Watch amount for GBP conversion
+  const amountSats = watch('amountSats') || 0;
+  const gbpEquivalent = btcGbpPrice ? (amountSats / 100000000) * btcGbpPrice : null;
 
   const onSubmit = async (data: GiftFormData) => {
     setIsLoading(true);
@@ -113,12 +132,20 @@ export function GiftForm({ onSuccess }: GiftFormProps) {
           {/* Amount */}
           <div className="space-y-2">
             <Label htmlFor="amountSats">Amount (satoshis)</Label>
-            <Input
-              id="amountSats"
-              type="number"
-              placeholder="50000"
-              {...register('amountSats')}
-            />
+            <div className="relative">
+              <Input
+                id="amountSats"
+                type="number"
+                placeholder="50000"
+                {...register('amountSats')}
+              />
+              {gbpEquivalent && amountSats > 0 && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center text-sm text-muted-foreground">
+                  <PoundSterling className="w-3 h-3 mr-1" />
+                  {gbpEquivalent.toFixed(2)}
+                </div>
+              )}
+            </div>
             {errors.amountSats && (
               <p className="text-sm text-red-500">{errors.amountSats.message}</p>
             )}
