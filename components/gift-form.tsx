@@ -11,13 +11,23 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, addYears, addMonths, addDays, min as dateMin } from 'date-fns';
-import { Lock, Calendar, Copy, Check, Wallet, ArrowRight, PoundSterling } from 'lucide-react';
+import { Lock, Calendar, Copy, Check, Wallet, ArrowRight, Dollar, PoundSterling, Euro } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { validateAddress } from '@/lib/bitcoin';
+
+const network = (process.env.NEXT_PUBLIC_NETWORK || 'mainnet') as 'mainnet' | 'testnet';
+
+type Currency = 'gbp' | 'usd' | 'eur';
+
+const currencySymbols: Record<Currency, { symbol: string; icon: React.ReactNode }> = {
+  gbp: { symbol: '£', icon: <PoundSterling className="w-3 h-3" /> },
+  usd: { symbol: '$', icon: <Dollar className="w-3 h-3" /> },
+  eur: { symbol: '€', icon: <Euro className="w-3 h-3" /> },
+};
 
 const network = (process.env.NEXT_PUBLIC_NETWORK || 'mainnet') as 'mainnet' | 'testnet';
 
@@ -42,20 +52,25 @@ interface GiftFormProps {
 export function GiftForm({ onSuccess }: GiftFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [btcGbpPrice, setBtcGbpPrice] = useState<number | null>(null);
+  const [currency, setCurrency] = useState<Currency>('gbp');
+  const [prices, setPrices] = useState<Record<Currency, number>>({ gbp: 0, usd: 0, eur: 0 });
 
-  // Fetch BTC price on mount
+  // Fetch BTC prices in multiple currencies on mount
   useEffect(() => {
-    async function fetchPrice() {
+    async function fetchPrices() {
       try {
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=gbp');
+        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=gbp,usd,eur');
         const data = await res.json();
-        setBtcGbpPrice(data.bitcoin.gbp);
+        setPrices({
+          gbp: data.bitcoin.gbp,
+          usd: data.bitcoin.usd,
+          eur: data.bitcoin.eur,
+        });
       } catch (e) {
         console.error('Failed to fetch BTC price:', e);
       }
     }
-    fetchPrice();
+    fetchPrices();
   }, []);
 
   const {
@@ -72,9 +87,11 @@ export function GiftForm({ onSuccess }: GiftFormProps) {
     },
   });
 
-  // Watch amount for GBP conversion
+  // Watch amount for currency conversion
   const amountSats = watch('amountSats') || 0;
-  const gbpEquivalent = btcGbpPrice ? (amountSats / 100000000) * btcGbpPrice : null;
+  const btcAmount = amountSats / 100000000;
+  const fiatEquivalent = btcAmount * prices[currency];
+  const currentSymbol = currencySymbols[currency].symbol;
 
   const onSubmit = async (data: GiftFormData) => {
     setIsLoading(true);
@@ -131,7 +148,25 @@ export function GiftForm({ onSuccess }: GiftFormProps) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Amount */}
           <div className="space-y-2">
-            <Label htmlFor="amountSats">Amount (satoshis)</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="amountSats">Amount (satoshis)</Label>
+              <div className="flex gap-1">
+                {(['gbp', 'usd', 'eur'] as Currency[]).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setCurrency(c)}
+                    className={`px-2 py-1 text-xs rounded ${
+                      currency === c 
+                        ? 'bg-primary text-primary-foreground' 
+                        : 'bg-muted hover:bg-muted/80'
+                    }`}
+                  >
+                    {c.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="relative">
               <Input
                 id="amountSats"
@@ -139,10 +174,10 @@ export function GiftForm({ onSuccess }: GiftFormProps) {
                 placeholder="50000"
                 {...register('amountSats')}
               />
-              {gbpEquivalent && amountSats > 0 && (
+              {fiatEquivalent > 0 && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center text-sm text-muted-foreground">
-                  <PoundSterling className="w-3 h-3 mr-1" />
-                  {gbpEquivalent.toFixed(2)}
+                  {currencySymbols[currency].icon}
+                  <span className="ml-1">{fiatEquivalent.toFixed(2)}</span>
                 </div>
               )}
             </div>
@@ -150,7 +185,7 @@ export function GiftForm({ onSuccess }: GiftFormProps) {
               <p className="text-sm text-red-500">{errors.amountSats.message}</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Minimum 6,000 sats (~£3)
+              Minimum 6,000 sats (~{currentSymbol}3)
             </p>
           </div>
 
