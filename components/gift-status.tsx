@@ -15,7 +15,8 @@ import {
   AlertCircle, 
   ExternalLink,
   Copy,
-  RefreshCw
+  RefreshCw,
+  MessageSquare
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -127,6 +128,19 @@ export function GiftStatus({ gift, network }: GiftStatusProps) {
             </p>
           )}
         </div>
+
+        {/* Message (if exists) */}
+        {currentGift.message && (
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Message
+            </Label>
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="text-sm italic">"{currentGift.message}"</p>
+            </div>
+          </div>
+        )}
 
         {/* Deposit Address (if pending) */}
         {currentGift.status === 'pending' && (
