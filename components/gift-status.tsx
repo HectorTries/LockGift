@@ -243,15 +243,13 @@ export function GiftStatus({ gift, network }: GiftStatusProps) {
                   <code className="flex-1 p-2 bg-muted rounded text-xs break-all">
                     {currentGift.deposit_txid}
                   </code>
-                  <Button variant="outline" size="icon" asChild>
-                    <a 
+                  <a className="inline-flex items-center justify-center h-9 w-9 border border-input bg-background shadow-sm rounded-md hover:bg-accent" 
                       href={getExplorerTxLink(currentGift.deposit_txid, network)} 
                       target="_blank" 
                       rel="noopener noreferrer"
                     >
                       <ExternalLink className="w-4 h-4" />
                     </a>
-                  </Button>
                 </div>
               </div>
             )}
@@ -263,15 +261,13 @@ export function GiftStatus({ gift, network }: GiftStatusProps) {
                   <code className="flex-1 p-2 bg-muted rounded text-xs break-all">
                     {currentGift.lock_txid}
                   </code>
-                  <Button variant="outline" size="icon" asChild>
-                    <a 
+                  <a className="inline-flex items-center justify-center h-9 w-9 border border-input bg-background shadow-sm rounded-md hover:bg-accent" 
                       href={getExplorerTxLink(currentGift.lock_txid, network)} 
                       target="_blank" 
                       rel="noopener noreferrer"
                     >
                       <ExternalLink className="w-4 h-4" />
                     </a>
-                  </Button>
                 </div>
               </div>
             )}

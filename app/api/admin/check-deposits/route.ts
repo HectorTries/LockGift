@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const network = (process.env.NEXT_PUBLIC_NETWORK || 'mainnet') as 'mainnet' | 'testnet';
+    const network = (process.env.NEXT_PUBLIC_NETWORK || 'testnet') as 'mainnet' | 'testnet';
     const mempoolUrl = process.env.NEXT_PUBLIC_MEMPOOL_URL || 
       (network === 'mainnet' ? 'https://mempool.space/api' : 'https://mempool.space/testnet/api');
     
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
         });
         
         // Broadcast the lock transaction
-        const lockTxid = await broadcastTransaction(lockTx.psbt, mempoolUrl);
+        const lockTxid = await broadcastTransaction(lockTx.txHex, mempoolUrl);
         
         // Update gift status
         await lockGift(gift.id, {

@@ -7,7 +7,7 @@ import * as bitcoin from 'bitcoinjs-lib';
 import { ECPairFactory } from 'ecpair';
 import * as tinysecp from 'tiny-secp256k1';
 import * as bip32 from 'bip32';
-import { payments, lazy } from 'bitcoinjs-lib';
+import { payments } from 'bitcoinjs-lib';
 
 // Use ECPair for key handling
 const ECPair = ECPairFactory(tinysecp);
@@ -120,7 +120,7 @@ export interface LockingTxParams {
   unlockTimestamp: number; // Unix timestamp
   feePercent: number;
   feeAddress: string;
-  claimUrl: string; // URL for beneficiary to claim
+  claimUrl?: string; // URL for beneficiary to claim
   
   // Network
   network: Network;
@@ -128,6 +128,7 @@ export interface LockingTxParams {
 
 export interface LockingTxResult {
   psbt: string;
+  txHex: string; // raw signed tx hex — this is what gets broadcast to mempool /tx
   txid: string;
   feeSats: number;
   lockedAmountSats: number;
@@ -139,18 +140,48 @@ export interface LockingTxResult {
  */
 function createCLTVRedeemScript(
   beneficiaryPubkeyHash: Buffer,
-  unlockTimestamp: number,
+  unlockTimestamp: number
+): Buffer {
+  if (beneficiaryPubkeyHash.length !== 20) {
+    throw new Error('Beneficiary pubkey hash must be 20 bytes');
+  }
+  // Proper script-number push (minimal encoding) for the locktime
+  const locktimePush = bitcoin.script.number.encode(unlockTimestamp);
+  return bitcoin.script.compile([
+    locktimePush,
+    bitcoin.opcodes.OP_CHECKLOCKTIMEVERIFY,
+    bitcoin.opcodes.OP_DROP,
+    beneficiaryPubkeyHash,
+    bitcoin.opcodes.OP_CHECKSIG,
+  ]);
+}
+
+/**
+ * Extract the 20-byte hash160 that the beneficiary can sign for.
+ * Supports P2WPKH (0014{20}) and P2PKH (76a914{20}88ac).
+ * Other address types (P2TR, P2WSH, P2SH) cannot be proven to map to a
+ * single CHECKSIG key, so they are rejected.
+ */
+export function beneficiaryPubkeyHashFromAddress(
+  beneficiaryAddress: string,
   network: Network
 ): Buffer {
   const networkConfig = getNetwork(network);
-  
-  // CLTV expects locktime as OP_0 through OP_16 or a number
-  // We'll use a numeric push for the timestamp
-  const lockTimeBuffer = Buffer.alloc(4);
-  lockTimeBuffer.writeUInt32LE(unlockTimestamp, 0);
-  
-  return bitcoin.script.fromASM(
-    `${lockTimeBuffer.toString('hex')} OP_CHECKLOCKTIMEVERIFY OP_DROP ${beneficiaryPubkeyHash.toString('hex')} OP_CHECKSIG`
+  const outScript = bitcoin.address.toOutputScript(beneficiaryAddress, networkConfig);
+  // P2WPKH: OP_0 <20 bytes>
+  if (outScript.length === 22 && outScript[0] === 0x00 && outScript[1] === 0x14) {
+    return Buffer.from(outScript.subarray(2));
+  }
+  // P2PKH: OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
+  if (
+    outScript.length === 25 &&
+    outScript[0] === 0x76 && outScript[1] === 0xa9 && outScript[2] === 0x14 &&
+    outScript[23] === 0x88 && outScript[24] === 0xac
+  ) {
+    return Buffer.from(outScript.subarray(3, 23));
+  }
+  throw new Error(
+    'Beneficiary address must be P2WPKH (bech32) or P2PKH so the recipient can sign the CLTV spend'
   );
 }
 
@@ -173,17 +204,14 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
 
   const networkConfig = getNetwork(network);
   const hotKeyPair = ECPair.fromWIF(hotWalletWif, networkConfig);
-  
-  // Get beneficiary pubkey hash
-  // First validate the beneficiary address to get info
-  const beneficiaryOutputScript = bitcoin.address.toOutputScript(beneficiaryAddress, networkConfig);
-  
-  // For P2WSH, we need the full pubkey, but for simplicity we'll use the address
-  // as the hash (this works with the pattern)
-  const beneficiaryPubkeyHash = bitcoin.crypto.ripemd160(bitcoin.crypto.sha256(hotKeyPair.publicKey));
-  
+  const hotPubkey = Buffer.from(hotKeyPair.publicKey);
+
+  // FIX: lock funds to the BENEFICIARY's key hash, not the hot wallet key.
+  // (Previously derived from hotKeyPair.publicKey => recipient could never spend.)
+  const beneficiaryPubkeyHash = beneficiaryPubkeyHashFromAddress(beneficiaryAddress, network);
+
   // Create the CLTV redeem script
-  const redeemScript = createCLTVRedeemScript(beneficiaryPubkeyHash, unlockTimestamp, network);
+  const redeemScript = createCLTVRedeemScript(beneficiaryPubkeyHash, unlockTimestamp);
   
   // Calculate amounts
   const feeSats = Math.floor(utxoAmountSats * (feePercent / 100));
@@ -198,11 +226,17 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
   // Build the PSBT
   const psbt = new bitcoin.Psbt({ network: networkConfig });
   
-  // Add input (the UTXO we're spending)
+  // FIX: segwit inputs need witnessUtxo or signing throws.
+  // The spent UTXO is the deposit P2WPKH output owned by hotWalletWif.
+  const depositP2wpkh = bitcoin.payments.p2wpkh({ pubkey: hotPubkey, network: networkConfig });
   psbt.addInput({
     hash: utxoTxId,
     index: utxoVout,
-    sequence: 0xe0, // Enable locktime
+    sequence: 0xfffffffe, // < 0xffffffff so locktime/CLTV rules apply; non-RBF-opt-out
+    witnessUtxo: {
+      script: depositP2wpkh.output!,
+      value: utxoAmountSats,
+    },
   });
   
   // Output 1: Fee to operator (spendable immediately)
@@ -217,6 +251,7 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
     network: networkConfig,
   });
   
+  if (!p2wsh.address) throw new Error('Failed to derive P2WSH address');
   psbt.addOutput({
     address: p2wsh.address,
     value: lockedAmountSats,
@@ -224,7 +259,7 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
   
   // Output 3: OP_RETURN with claim instructions
   // Encode claim URL as OP_RETURN
-  const message = `Claim at ${claimUrl}`;
+  const message = claimUrl ? `Claim at ${claimUrl}` : 'LockGift time-locked gift';
   const data = Buffer.from(message, 'utf8');
   const opReturnScript = bitcoin.script.compile([
     bitcoin.opcodes.OP_RETURN,
@@ -242,9 +277,11 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
   // Finalize inputs
   psbt.finalizeAllInputs();
   
+  const tx = psbt.extractTransaction();
   return {
     psbt: psbt.toBase64(),
-    txid: psbt.extractTransaction().getId(),
+    txHex: tx.toHex(),
+    txid: tx.getId(),
     feeSats,
     lockedAmountSats,
   };
@@ -254,7 +291,7 @@ export function buildLockingTransaction(params: LockingTxParams): LockingTxResul
  * Broadcast a transaction via Mempool.space API
  */
 export async function broadcastTransaction(
-  psbtBase64: string,
+  txHex: string,
   mempoolUrl: string
 ): Promise<string> {
   const response = await fetch(`${mempoolUrl}/tx`, {
@@ -262,7 +299,7 @@ export async function broadcastTransaction(
     headers: {
       'Content-Type': 'text/plain',
     },
-    body: psbtBase64,
+    body: txHex,
   });
   
   if (!response.ok) {

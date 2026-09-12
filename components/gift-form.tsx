@@ -11,7 +11,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format, addYears, addMonths, addDays, min as dateMin } from 'date-fns';
-import { Lock, Calendar, Copy, Check, Wallet, ArrowRight, Dollar, PoundSterling, Euro } from 'lucide-react';
+import { Lock, Calendar, Copy, Check, Wallet, ArrowRight, DollarSign, PoundSterling, Euro } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,17 +19,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { validateAddress } from '@/lib/bitcoin';
 
-const network = (process.env.NEXT_PUBLIC_NETWORK || 'mainnet') as 'mainnet' | 'testnet';
+const network = (process.env.NEXT_PUBLIC_NETWORK || 'testnet') as 'mainnet' | 'testnet';
 
 type Currency = 'gbp' | 'usd' | 'eur';
 
 const currencySymbols: Record<Currency, { symbol: string; icon: React.ReactNode }> = {
   gbp: { symbol: '£', icon: <PoundSterling className="w-3 h-3" /> },
-  usd: { symbol: '$', icon: <Dollar className="w-3 h-3" /> },
+  usd: { symbol: '$', icon: <DollarSign className="w-3 h-3" /> },
   eur: { symbol: '€', icon: <Euro className="w-3 h-3" /> },
 };
-
-const network = (process.env.NEXT_PUBLIC_NETWORK || 'mainnet') as 'mainnet' | 'testnet';
 
 // Form validation schema
 const giftSchema = z.object({

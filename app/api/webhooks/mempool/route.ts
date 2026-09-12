@@ -37,14 +37,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Get UTXO details
+    const { generateHDFeatureAddress } = await import('@/lib/bitcoin');
     const network = (process.env.NEXT_PUBLIC_NETWORK || 'testnet') as 'mainnet' | 'testnet';
     const mempoolUrl = process.env.NEXT_PUBLIC_MEMPOOL_URL || 'https://mempool.space/testnet/api';
-    const hotWalletWif = process.env.HOT_WALLET_WIF;
+    const hdSeed = process.env.HD_SEED;
     const feeAddress = process.env.FEE_ADDRESS;
 
-    if (!hotWalletWif || !feeAddress) {
+    if (!hdSeed || gift.hd_index === null || !feeAddress) {
       return NextResponse.json({ message: 'Server configuration error' }, { status: 500 });
     }
+    // Per-gift deposit key derived from HD seed (same as check-deposits route)
+    const { privateKey: hotWalletWif } = generateHDFeatureAddress(hdSeed, gift.hd_index, network);
 
     // Get the UTXO that was just deposited
     const utxo = await getUtxo(address, mempoolUrl);
@@ -72,7 +75,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Broadcast the locking transaction
-      const lockTxId = await broadcastTransaction(lockingResult.psbt, mempoolUrl);
+      const lockTxId = await broadcastTransaction(lockingResult.txHex, mempoolUrl);
 
       // Update gift status
       await lockGift(gift.id, {
