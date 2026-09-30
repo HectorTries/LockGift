@@ -105,7 +105,7 @@ export default function HomePage() {
             <strong>Note:</strong> This is a trust-minimized system but you trust the 
             operator to broadcast the correct locking transaction. Always verify 
             the lock transaction on mempool.space before considering the gift complete. 
-            A 5% fee is taken on the deposited amount.
+            A 1% fee is taken on the deposited amount.
           </p>
         </CardContent>
       </Card>
